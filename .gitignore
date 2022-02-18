@@ -1,0 +1,10 @@
+*.xlsx
+__pycache__/*
+dist/*
+build/*
+*.spec
+Dockerfile
+run_app.sh
+test.py
+
+
