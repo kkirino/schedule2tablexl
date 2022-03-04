@@ -1,5 +1,5 @@
 #########################
-##### Version 0.1.2 #####
+##### Version 0.1.3 #####
 #########################
 
 import os
@@ -34,93 +34,135 @@ def button2_clicked():
 
 
 def button3_clicked():
-    schedule_book = openpyxl.load_workbook(name1.get())
-    template_book = openpyxl.load_workbook(name2.get())
+    schedule_book_name = name1.get()
+    # schedule_book_name = "./xlsx_files/schedule/01_schedule.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/02_schedule_excess_sheet.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/03_schedule_values_at_space.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/04_schedule_duplicate.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/05_schedule_two_rows_in_a_day.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/06_schedule_two_rows_in_two_days.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/07_schedule_short.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/08_schedule_blank.xlsx"
+    # schedule_book_name = "./xlsx_files/schedule/09_schedule_diff_in_names.xlsx"
+
+    template_book_name = name2.get()
+    # template_book_name = "./xlsx_files/template/template.xlsx"
+
+    schedule_book = openpyxl.load_workbook(schedule_book_name)
+    template_book = openpyxl.load_workbook(template_book_name)
+
     schedule_sheet_names = schedule_book.sheetnames
     template_sheet_names = template_book.sheetnames
     if len(schedule_sheet_names) > 1 or len(template_sheet_names) > 1:
         messagebox.showerror("エラー", "シートは1つにしてください。")
     else:
         try:
-            df = pd.read_excel(name1.get(), sheet_name=0)
-            doctors_in_schedule = df["担当"].unique().tolist()
+            df = pd.read_excel(schedule_book_name, sheet_name=0)
 
-            for i in range(df.shape[0]):
-                # row_list = df.iloc[i].to_numpy()
-                row_list = df.iloc[i]
+            df_with_new_rows = df
+            for index, row in df.iterrows():
                 new_work_title = ""
-                if row_list[1] == "当日直":
-                    df.iloc[i, 1] = "当直"
+                if row[1] == "当日直":
+                    df_with_new_rows.iloc[index, 1] = "当直"
                     new_work_title = "日直"
-                elif row_list[1] == "日当日直":
-                    df.iloc[i, 1] = "日当直"
+                elif row[1] == "日当日直":
+                    df_with_new_rows.iloc[index, 1] = "日当直"
                     new_work_title = "日直"
-                elif row_list[1] == "当直＋午前":
-                    df.iloc[i, 1] = "当直"
+                elif row[1] == "当直＋午前":
+                    df_with_new_rows.iloc[index, 1] = "当直"
                     new_work_title = "午前"
                 if new_work_title != "":
                     new_row = pd.Series(
                         [
-                            row_list[0],
+                            row[0],
                             new_work_title,
-                            row_list[2],
-                            row_list[6],
-                            row_list[4],
-                            row_list[5],
-                            row_list[6],
-                            row_list[7],
-                            row_list[8],
+                            row[2],
+                            row[6],
+                            row[4],
+                            row[5],
+                            row[6],
+                            row[7],
+                            row[8],
                         ],
                         index=df.columns,
                     )
-                    df = df.append(new_row, ignore_index=True)
+                    df_with_new_rows = df_with_new_rows.append(
+                        new_row, ignore_index=True
+                    )
 
-            df["year"] = df["開始日"].dt.strftime("%Y").map(lambda str: int(str))
-            df["month"] = df["開始日"].dt.strftime("%m").map(lambda str: int(str))
-            df["date"] = df["開始日"].dt.day
-            df["week_index"] = df["開始日"].dt.weekday
-            df["weekday"] = df["week_index"].map(lambda index: week_list[index])
-            df["doctor"] = df["担当"]
-            df["value"] = df[["施設名", "仕事内容"]].apply(" ".join, axis=1)
-            df = df.pivot(
+            df_with_new_rows["year"] = (
+                df_with_new_rows["開始日"].dt.strftime("%Y").map(lambda str: int(str))
+            )
+            df_with_new_rows["month"] = (
+                df_with_new_rows["開始日"].dt.strftime("%m").map(lambda str: int(str))
+            )
+            df_with_new_rows["date"] = df_with_new_rows["開始日"].dt.day
+            df_with_new_rows["week_index"] = df_with_new_rows["開始日"].dt.weekday
+            df_with_new_rows["weekday"] = df_with_new_rows["week_index"].map(
+                lambda index: week_list[index]
+            )
+            df_with_new_rows["doctor"] = df_with_new_rows["担当"]
+            df_with_new_rows["value"] = df_with_new_rows[["施設名", "仕事内容"]].apply(
+                " ".join, axis=1
+            )
+            df_wide = df_with_new_rows.pivot(
                 index=["year", "month", "date", "weekday"],
                 columns="doctor",
                 values="value",
             )
-            df = df.rename_axis().reset_index()
-            date_count = df.shape[0]
+            df_wide = df_wide.rename_axis().reset_index()
 
-            year = df["year"].mode().tolist()[0]
-            month = df["month"].mode().tolist()[0]
+            date_count = df_wide.shape[0]
+            year = df_wide["year"].mode().tolist()[0]
+            month = df_wide["month"].mode().tolist()[0]
+            doctors_in_schedule = df["担当"].unique().tolist()
 
             ws = template_book[template_sheet_names[0]]
             ws["B2"].value = "ネーベン表 " + str(year) + " 年 " + str(month) + " 月"
-            num_del_rows = 34 - date_count
+
+            # fit size according to date_count
+            num_row = ws.max_row
+            num_del_rows = num_row - 6 - date_count
             if num_del_rows > 0:
                 ws.delete_rows(idx=6, amount=num_del_rows)
 
-            num_col = ws.max_column
+            # write date and weekday values according to the schedule sheet information
             for i in range(date_count):
-                if df["month"][i] != month or df["date"][i] == 1:
+                # write date (and month) values
+                if df_wide["month"][i] != month or df_wide["date"][i] == 1:
                     ws.cell(5 + i, 2).value = (
-                        str(df["month"][i]) + "/" + str(df["date"][i])
+                        str(df_wide["month"][i]) + "/" + str(df_wide["date"][i])
                     )
                 else:
-                    ws.cell(5 + i, 2).value = str(df["date"][i])
-                ws.cell(5 + i, 3).value = df["weekday"][i]
+                    ws.cell(5 + i, 2).value = str(df_wide["date"][i])
+                ws.cell(5 + i, 3).value = df_wide["weekday"][i]
 
+            # write doctor names and change background filling at null cells
+            num_col = ws.max_column
             for i in range(4, num_col - 2):
                 doctor = ws.cell(4, i).value
                 if doctor in doctors_in_schedule:
                     for j in range(date_count):
-                        value = df[doctor][j]
+                        value = df_wide[doctor][j]
                         ws.cell(5 + j, i).value = value
                         if pd.isna(value):
                             ws.cell(5 + j, i).fill = PatternFill(fill_type=None)
 
+            # check if doctor names in schedule sheet are indeed in doctors_in_template
+            doctors_in_template = []
+            for i in range(4, num_col - 2):
+                doctors_in_template.append(ws.cell(4, i).value)
+            doctors_missing = []
+            for name in doctors_in_schedule:
+                if name not in doctors_in_template:
+                    doctors_missing.append(str(name))
+
+            # change color the row where Saturday, Sunday or holiday
             for i in range(date_count):
-                weekday = df["weekday"][i]
-                date = datetime.datetime(df["year"][i], df["month"][i], df["date"][i])
+                weekday = df_wide["weekday"][i]
+                date = datetime.datetime(
+                    df_wide["year"][i], df_wide["month"][i], df_wide["date"][i]
+                )
                 if weekday == "日" or jpholiday.is_holiday(date):
                     for j in range(2, num_col):
                         ws.cell(5 + i, j).fill = PatternFill(
@@ -132,6 +174,7 @@ def button3_clicked():
                             patternType="solid", fgColor="ffff00"
                         )
 
+            # generate timestamp for created xlsx file name
             dt_now = datetime.datetime.now(
                 datetime.timezone(datetime.timedelta(hours=9))
             )
@@ -140,7 +183,18 @@ def button3_clicked():
                 dir_name, "schedule2tablexloutput_" + timestamp + ".xlsx"
             )
             template_book.save(dest_path)
-            messagebox.showinfo("お知らせ", dest_path + "を作成しました")
+
+            message = dest_path + "を作成しました\n"
+            is_nan_bool_list = list(map(lambda str: str == "nan", doctors_missing))
+            if sum(is_nan_bool_list) > 0:
+                message = message + "空欄があります\n"
+            doctors_missing_without_nan = [x for x in doctors_missing if x != "nan"]
+            if len(doctors_missing_without_nan) > 0:
+                message = (
+                    message + ",".join(doctors_missing_without_nan) + "先生がうまく登録できていません"
+                )
+
+            messagebox.showinfo("お知らせ", message)
 
         except ValueError:
             messagebox.showerror("エラー", "うまく処理できません")
@@ -188,3 +242,5 @@ if __name__ == "__main__":
     button3.grid(row=0, column=0)
 
     root.mainloop()
+
+# button3_clicked()
