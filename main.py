@@ -14,7 +14,7 @@ import datetime
 import jpholiday
 
 dir_name = os.path.abspath(os.path.dirname(__file__))
-week_list = ["月", "火", "水", "木", "金", "土", "日"]
+week_tupple = ("月", "火", "水", "木", "金", "土", "日")
 
 
 def button1_clicked():
@@ -59,7 +59,7 @@ def button3_clicked():
         try:
             df = pd.read_excel(schedule_book_name, sheet_name=0)
 
-            df_with_new_rows = df
+            df_with_new_rows = df.copy()
             for index, row in df.iterrows():
                 new_work_title = ""
                 if row[1] == "当日直":
@@ -99,7 +99,7 @@ def button3_clicked():
             df_with_new_rows["date"] = df_with_new_rows["開始日"].dt.day
             df_with_new_rows["week_index"] = df_with_new_rows["開始日"].dt.weekday
             df_with_new_rows["weekday"] = df_with_new_rows["week_index"].map(
-                lambda index: week_list[index]
+                lambda index: week_tupple[index]
             )
             df_with_new_rows["doctor"] = df_with_new_rows["担当"]
             df_with_new_rows["value"] = df_with_new_rows[["施設名", "仕事内容"]].apply(
